@@ -11,6 +11,6 @@ Simply place the bm_extramenu folder in you resources folder and ensure in serve
 Runs at 0.01ms when not near the circle
 
 # Future additions
-- Reduce bloat code relating to menucreation 
+- Reduce bloat code relating to menu creation 
 
 
