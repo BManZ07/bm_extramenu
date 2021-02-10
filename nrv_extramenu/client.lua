@@ -4,17 +4,18 @@ local PlayerData = {}
 local isNear = false
 local isInMarker = false
 
+
 Citizen.CreateThread(function()
 	while ESX == nil do
 		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 		Citizen.Wait(0)
 	end
 
-	while ESX.GetPlayerData() == nil do
+	while ESX.GetPlayerData().job == nil do
 		Citizen.Wait(10)
 	end
 	
-    ESX.PlayerData = ESX.GetPlayerData()
+    PlayerData = ESX.GetPlayerData()
 end)
 
 RegisterNetEvent('esx:playerLoaded')
@@ -47,35 +48,64 @@ function canTint()
     end
 end
 
-
+local onMarker = nil
+local nearMarker = nil
 Citizen.CreateThread(function()
 	while true do
-		Citizen.Wait(0)
+		local timer = nil
 		local playerPed = PlayerPedId()
 		local veh = GetVehiclePedIsIn(playerPed, false) 
 		local isInCar = IsPedInVehicle(playerPed, veh, false)
 
 		local coords = GetEntityCoords(playerPed)
 		if IsJobTrue() and isInCar then
-			if isNear == true then
-				DrawMarker(27, Config.MarkerCoords.x, Config.MarkerCoords.y, Config.MarkerCoords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 0, 0, 255, 100, false, true, 2, false, nil, nil, false)
-				if isInMarker == true then
-					if not menuOpen then
-						ESX.ShowHelpNotification("Press ~INPUT_CONTEXT~ to modify your car")
+			timer = 0
+			if isNear == true  then
+				if GetVehicleClass( veh ) == 18 or IsPedInAnyPoliceVehicle(playerPed) then
+					timer = 0
+					for i=1, #Config.MarkerCoords, 1 do
+						if i == nearMarker then
+							DrawMarker(44, Config.MarkerCoords[nearMarker].x, Config.MarkerCoords[nearMarker].y, Config.MarkerCoords[nearMarker].z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.75, 0.75, 0.75, 0, 0, 255, 100, false, true, 2, true, nil, nil, false)
+							if isInMarker and i == onMarker then
+								local size = 0.4
+								local font = 0
+								local coords = vector3(Config.MarkerCoords[onMarker].x, Config.MarkerCoords[onMarker].y, Config.MarkerCoords[onMarker].z)
 
-						if IsControlJustReleased(0, 38) then
-							menuOpen = true
-							OpenExtrasMenu()
+								local camCoords = GetGameplayCamCoords()
+								local distance = #(coords - camCoords)
+
+								local scale = (size / distance) * 2
+								local fov = (1 / GetGameplayCamFov()) * 100
+								scale = scale * fov
+
+								SetTextScale(0.0 * scale, 0.95 * scale)
+								SetTextFont(font)
+								SetTextColour(255, 255, 255, 255)
+								SetTextDropshadow(0, 0, 0, 0, 255)
+								SetTextDropShadow()
+								SetTextOutline()
+								SetTextCentre(true)
+
+								SetDrawOrigin(coords, 0)
+								Citizen.InvokeNative(0x25FBB336DF1804CB, 'STRING')
+								Citizen.InvokeNative(0x6C188BE134E074AA, 'Press [~g~E~w~] to modify your vehicle')
+								Citizen.InvokeNative(0xCD015E5BB0D96A57, 0.0, 0.0)
+								ClearDrawOrigin()
+								
+								if IsControlJustReleased(0, 38) then
+									OpenExtrasMenu()
+								end
+							end
 						end
 					end
-				else
-					if menuOpen then
-						menuOpen = false
-						ESX.UI.Menu.CloseAll()
-					end
 				end
+			else
+				timer = 1000
 			end
-		end			
+		else
+			timer = 1000
+		end
+		Citizen.Wait(timer)		
 	end
 end)
 
@@ -86,21 +116,22 @@ Citizen.CreateThread(function()
 		local veh = GetVehiclePedIsIn(playerPed, false) 
 		local isInCar = IsPedInVehicle(playerPed, veh, false)
 		local coords = GetEntityCoords(playerPed)
-
-		if GetDistanceBetweenCoords(coords, Config.MarkerCoords.x, Config.MarkerCoords.y, Config.MarkerCoords.z, true) < 15.0 then
-			isNear = true
-		else
-			isNear = false
+		isNear = false
+		isInMarker = false
+		for i=1, #Config.MarkerCoords, 1 do
+			if GetDistanceBetweenCoords(coords, Config.MarkerCoords[i].x, Config.MarkerCoords[i].y, Config.MarkerCoords[i].z, false) < 15.0 then
+				isNear = true
+				nearMarker = i
+				if GetDistanceBetweenCoords(coords, Config.MarkerCoords[i].x, Config.MarkerCoords[i].y, Config.MarkerCoords[i].z, false) < 2.0 then
+					isInMarker = true
+					onMarker = i
+				end
+				break
+			end
 		end
-
-		if GetDistanceBetweenCoords(coords, Config.MarkerCoords.x, Config.MarkerCoords.y, Config.MarkerCoords.z, true) < 2.0 then
-			isInMarker = true
-		else
-			isInMarker = false
-		end
-
 	end
 end)
+
 
 
 
@@ -113,41 +144,14 @@ function OpenExtrasMenu(station)
 	table.insert(elements, {label = "Vehicle Colours",     value = 'veh_colour'})
 	table.insert(elements, {label = "Window Tint",     value = 'tint'})
 
-	if DoesExtraExist(veh, 1) then
-		table.insert(elements, {label = "Extra 1",     value = 'extra_1'})
+	for i=1, 12, 1 do
+		if DoesExtraExist(veh, i) then
+			table.insert(elements, {label = "Extra "..i,     value = 'extra', extraNum = i})
+		end
 	end
-	if DoesExtraExist(veh, 2) then
-		table.insert(elements, {label = "Extra 2",     value = 'extra_2'})
-	end
-	if DoesExtraExist(veh, 3) then
-		table.insert(elements, {label = "Extra 3",     value = 'extra_3'})
-	end
-	if DoesExtraExist(veh, 4) then
-		table.insert(elements, {label = "Extra 4",     value = 'extra_4'})
-	end
-	if DoesExtraExist(veh, 5) then
-		table.insert(elements, {label = "Extra 5",     value = 'extra_5'})
-	end
-	if DoesExtraExist(veh, 6) then
-		table.insert(elements, {label = "Extra 6",     value = 'extra_6'})
-	end
-	if DoesExtraExist(veh, 7) then
-		table.insert(elements, {label = "Extra 7",     value = 'extra_7'})
-	end
-	if DoesExtraExist(veh, 8) then
-		table.insert(elements, {label = "Extra 8",     value = 'extra_8'})
-	end
-	if DoesExtraExist(veh, 9) then
-		table.insert(elements, {label = "Extra 9",     value = 'extra_9'})
-	end
-	if DoesExtraExist(veh, 10) then
-		table.insert(elements, {label = "Extra 10",     value = 'extra_10'})
-	end
-	if DoesExtraExist(veh, 11) then
-		table.insert(elements, {label = "Extra 11",     value = 'extra_11'})
-	end
-	if DoesExtraExist(veh, 12) then
-		table.insert(elements, {label = "Extra 12",     value = 'extra_12'})
+	
+	if GetVehicleLiveryCount(veh) >= 2 then
+		table.insert(elements, {label = "Vehicle Livery",     value = 'livery'})
 	end
 
 	ESX.UI.Menu.CloseAll()
@@ -166,30 +170,37 @@ function OpenExtrasMenu(station)
 			else
 				exports['mythic_notify']:DoHudText('error', "You cannot access tint!")
 			end
-		elseif data.current.value == 'extra_1' then
-			Extras_1_Menu()
-		elseif data.current.value == 'extra_2' then
-			Extras_2_Menu()
-		elseif data.current.value == 'extra_3' then
-			Extras_3_Menu()
-		elseif data.current.value == 'extra_4' then
-			Extras_4_Menu()
-		elseif data.current.value == 'extra_5' then
-			Extras_5_Menu()
-		elseif data.current.value == 'extra_6' then
-			Extras_6_Menu()
-		elseif data.current.value == 'extra_7' then
-			Extras_7_Menu()
-		elseif data.current.value == 'extra_8' then
-			Extras_8_Menu()
-		elseif data.current.value == 'extra_9' then
-			Extras_9_Menu()
-		elseif data.current.value == 'extra_10' then
-			Extras_10_Menu()
-		elseif data.current.value == 'extra_11' then
-			Extras_11_Menu()
-		elseif data.current.value == 'extra_12' then
-			Extras_12_Menu()
+		elseif data.current.value == 'extra' then
+			Extras_Menu(data.current.extraNum)
+		elseif data.current.value == 'livery' then
+			OpenLiveryMenu()
+		end
+
+	end, function(data, menu)
+		menu.close()
+	end)
+end
+
+function OpenLiveryMenu(station)
+	local elements = {}
+    local ped = GetPlayerPed(-1)
+    local veh = GetVehiclePedIsIn(ped, false)
+
+	for i = 1, GetVehicleLiveryCount(veh), 1 do
+		table.insert(elements, {label = 'Livery ' .. tostring(i),     value = i})
+	end
+
+
+	ESX.UI.Menu.CloseAll()
+
+	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'liverys', {
+		title    = "Vehicle Modification",
+		align    = 'top-left',
+		elements = elements
+	}, function(data, menu)
+
+		if data.current.value then
+			SetVehicleLivery(veh, data.current.value)
 		end
 
 	end, function(data, menu)
@@ -230,6 +241,8 @@ function Veh_Colour(station)
 		elseif data.current.value == 'col_red' then
 			SetVehicleColours(veh, 27, 35)
 		end
+		
+		Veh_Colour()
 
 	end, function(data, menu)
 		OpenExtrasMenu()
@@ -276,19 +289,21 @@ function Veh_Tint(station)
 				windowTint = 5
 			})
 		end
+		
+		Veh_Tint()
 
 	end, function(data, menu)
 		OpenExtrasMenu()
 	end)
 end
 
-function Extras_1_Menu(station)
+function Extras_Menu(extraNum)
     local elements = {}
     local ped = GetPlayerPed(-1)
     local veh = GetVehiclePedIsIn(ped, false)
 
-	table.insert(elements, {label = "Add",     value = 'extra_1_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_1_rem'})
+	table.insert(elements, {label = "Add",     value = 'add'})
+    table.insert(elements, {label = "Remove",     value = 'remove'})
 
 	ESX.UI.Menu.CloseAll()
 
@@ -298,310 +313,16 @@ function Extras_1_Menu(station)
 		elements = elements
 	}, function(data, menu)
 
-		if data.current.value == 'extra_1_add' then
-			SetVehicleExtra(veh, 1, 0)
-		elseif data.current.value == 'extra_1_rem' then
-			SetVehicleExtra(veh, 1, 1)
+		if data.current.value == 'add' then
+			SetVehicleExtra(veh, extraNum, 0)
+		elseif data.current.value == 'remove' then
+			SetVehicleExtra(veh, extraNum, 1)
 		end
+		
+		Extras_Menu(extraNum)
 
 	end, function(data, menu)
 		OpenExtrasMenu()
 	end)
 end
 
-function Extras_2_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_2_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_2_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_2_add' then
-			SetVehicleExtra(veh, 2, 0)
-		elseif data.current.value == 'extra_2_rem' then
-			SetVehicleExtra(veh, 2, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_3_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_3_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_3_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_3_add' then
-			SetVehicleExtra(veh, 3, 0)
-		elseif data.current.value == 'extra_3_rem' then
-			SetVehicleExtra(veh, 3, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_4_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_4_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_4_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_4_add' then
-			SetVehicleExtra(veh, 4, 0)
-		elseif data.current.value == 'extra_4_rem' then
-			SetVehicleExtra(veh, 4, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_5_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_5_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_5_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_5_add' then
-			SetVehicleExtra(veh, 5, 0)
-		elseif data.current.value == 'extra_5_rem' then
-			SetVehicleExtra(veh, 5, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_6_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_6_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_6_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_6_add' then
-			SetVehicleExtra(veh, 6, 0)
-		elseif data.current.value == 'extra_6_rem' then
-			SetVehicleExtra(veh, 6, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_7_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_7_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_7_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_7_add' then
-			SetVehicleExtra(veh, 7, 0)
-		elseif data.current.value == 'extra_7_rem' then
-			SetVehicleExtra(veh, 7, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_8_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_8_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_8_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_8_add' then
-			SetVehicleExtra(veh, 8, 0)
-		elseif data.current.value == 'extra_8_rem' then
-			SetVehicleExtra(veh, 8, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_9_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_9_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_9_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_9_add' then
-			SetVehicleExtra(veh, 9, 0)
-		elseif data.current.value == 'extra_9_rem' then
-			SetVehicleExtra(veh, 9, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_10_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_10_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_10_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_10_add' then
-			SetVehicleExtra(veh, 10, 0)
-		elseif data.current.value == 'extra_10_rem' then
-			SetVehicleExtra(veh, 10, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_11_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_11_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_11_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_11_add' then
-			SetVehicleExtra(veh, 11, 0)
-		elseif data.current.value == 'extra_11_rem' then
-			SetVehicleExtra(veh, 11, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
-
-function Extras_12_Menu(station)
-    local elements = {}
-    local ped = GetPlayerPed(-1)
-    local veh = GetVehiclePedIsIn(ped, false)
-
-	table.insert(elements, {label = "Add",     value = 'extra_12_add'})
-    table.insert(elements, {label = "Remove",     value = 'extra_12_rem'})
-
-	ESX.UI.Menu.CloseAll()
-
-	ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'extras', {
-		title    = "Vehicle Modification",
-		align    = 'top-left',
-		elements = elements
-	}, function(data, menu)
-
-		if data.current.value == 'extra_12_add' then
-			SetVehicleExtra(veh, 12, 0)
-		elseif data.current.value == 'extra_12_rem' then
-			SetVehicleExtra(veh, 12, 1)
-		end
-
-	end, function(data, menu)
-		OpenExtrasMenu()
-	end)
-end
