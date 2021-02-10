@@ -7,6 +7,6 @@ version '1.0.0'
 
 -- What to run
 client_script {
-    'client1.lua',
+    'client.lua',
     'config.lua'
 }
